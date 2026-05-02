@@ -5,23 +5,23 @@ import Combine
 class QuizViewModel: ObservableObject {
     @Published var questions: [Question] = []
     @Published var currentIndex = 0
-    @Published var selectedOption: String? = nil
+    @Published var selectedOption: WordOption? = nil
     @Published var showHint = false
     @Published var isCorrect: Bool? = nil
     @Published var score = 0
     @Published var isFinished = false
-    
-    // 💡 5秒後にヒントを解禁するための変数とタイマー
+    @Published var timeRemaining: Double = 10.0
+    @Published var timerActive = false
     @Published var canShowHintButton = false
-    private var hintTimer: AnyCancellable?
     
-    // 現在選択されている難易度を保持する
-    var currentLevel: QuestionLevel = .beginner
-    
+    private var mainTimer: AnyCancellable?
+    private var currentLevel: QuestionLevel = .beginner
+
     var currentQuestion: Question {
-        questions[currentIndex]
+        questions.indices.contains(currentIndex) ? questions[currentIndex] : Question.samples[0]
     }
-    
+
+    // 💡 復活：福島さんの温かいフィードバックメッセージ
     var feedbackMessage: String {
         switch score {
         case 5:
@@ -34,19 +34,52 @@ class QuizViewModel: ObservableObject {
             return "アプリを開いただけでもえらすぎる！"
         }
     }
-    
-    func checkAnswer(_ option: String) {
-        selectedOption = option
-        isCorrect = (option == currentQuestion.answer)
-        
-        if isCorrect == true {
-            score += 1
-        }
-        
-        // 回答した瞬間にタイマーは止める
-        hintTimer?.cancel()
+
+    func startQuiz(level: QuestionLevel) {
+        self.currentLevel = level
+        let filtered = Question.samples.filter { $0.level == level }
+        questions = Array(filtered.shuffled().prefix(5))
+        currentIndex = 0
+        score = 0
+        isFinished = false
+        resetState()
     }
-    
+
+    func startTimer() {
+        let limit = UserDefaults.standard.double(forKey: "quizLimitTime")
+        let actualLimit = limit > 0 ? limit : 10.0
+        
+        timeRemaining = actualLimit
+        timerActive = true
+        
+        mainTimer?.cancel()
+        mainTimer = Timer.publish(every: 0.1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self, self.timerActive else { return }
+                
+                if self.timeRemaining > 0 {
+                    self.timeRemaining -= 0.1
+                } else {
+                    self.timerActive = false
+                    self.isCorrect = false
+                }
+                
+                // ヒントボタン：5秒経過で出現
+                let elapsed = actualLimit - self.timeRemaining
+                if elapsed >= 5.0 && !self.canShowHintButton {
+                    withAnimation { self.canShowHintButton = true }
+                }
+            }
+    }
+
+    func checkAnswer(_ option: WordOption) {
+        timerActive = false
+        selectedOption = option
+        isCorrect = (option.word == currentQuestion.answer)
+        if isCorrect == true { score += 1 }
+    }
+
     func nextQuestion() {
         if currentIndex < questions.count - 1 {
             currentIndex += 1
@@ -55,42 +88,14 @@ class QuizViewModel: ObservableObject {
             isFinished = true
         }
     }
-    
-    // 引数として難易度（level）を受け取るように変更
-    func startQuiz(level: QuestionLevel) {
-        self.currentLevel = level
-        
-        // 1. 選ばれた難易度と同じ問題だけを抽出（filter）
-        let filteredQuestions = Question.samples.filter { $0.level == level }
-        
-        // 2. シャッフルして最大5問を取り出す
-        questions = Array(filteredQuestions.shuffled().prefix(5))
-        
-        currentIndex = 0
-        score = 0
-        isFinished = false
-        resetState()
-    }
-    
-    // 同じ難易度でもう一度遊ぶ用
-    func restartQuiz() {
-        startQuiz(level: self.currentLevel)
-    }
-    
+
+    func restartQuiz() { startQuiz(level: currentLevel) }
+
     private func resetState() {
         selectedOption = nil
         isCorrect = nil
         showHint = false
         canShowHintButton = false
-                
-        // 💡 新しい問題になったら、5秒後にヒントを解禁するタイマーをセット
-        hintTimer?.cancel()
-        hintTimer = Just(())
-            .delay(for: .seconds(5), scheduler: RunLoop.main)
-            .sink { [weak self] _ in
-                withAnimation(.easeInOut) {
-                    self?.canShowHintButton = true
-                }
-            }
+        startTimer()
     }
 }
