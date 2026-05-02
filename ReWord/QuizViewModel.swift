@@ -11,10 +11,12 @@ class QuizViewModel: ObservableObject {
     @Published var score = 0
     @Published var isFinished = false
     
+    // 💡 5秒後にヒントを解禁するための変数とタイマー
+    @Published var canShowHintButton = false
+    private var hintTimer: AnyCancellable?
+    
     // 現在選択されている難易度を保持する
     var currentLevel: QuestionLevel = .beginner
-    
-    // init() は外から startQuiz を呼ぶ形にするので削除してOKです
     
     var currentQuestion: Question {
         questions[currentIndex]
@@ -27,9 +29,9 @@ class QuizViewModel: ObservableObject {
         case 3...4:
             return "いい調子！継続は力なり"
         case 1...2:
-            return "繰り返し頑張ろう！"
-        default:
             return "まだまだこれから！伸び代しかない！"
+        default:
+            return "アプリを開いただけでもえらすぎる！"
         }
     }
     
@@ -40,6 +42,9 @@ class QuizViewModel: ObservableObject {
         if isCorrect == true {
             score += 1
         }
+        
+        // 回答した瞬間にタイマーは止める
+        hintTimer?.cancel()
     }
     
     func nextQuestion() {
@@ -76,5 +81,16 @@ class QuizViewModel: ObservableObject {
         selectedOption = nil
         isCorrect = nil
         showHint = false
+        canShowHintButton = false
+                
+        // 💡 新しい問題になったら、5秒後にヒントを解禁するタイマーをセット
+        hintTimer?.cancel()
+        hintTimer = Just(())
+            .delay(for: .seconds(5), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                withAnimation(.easeInOut) {
+                    self?.canShowHintButton = true
+                }
+            }
     }
 }
