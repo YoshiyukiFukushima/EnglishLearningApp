@@ -6,6 +6,7 @@ class QuizViewModel: ObservableObject {
     @Published var questions: [Question] = []
     @Published var currentIndex = 0
     @Published var selectedOption: WordOption? = nil
+    @Published var currentOptions: [WordOption] = []
     @Published var showHint = false
     @Published var isCorrect: Bool? = nil
     @Published var score = 0
@@ -96,6 +97,7 @@ class QuizViewModel: ObservableObject {
         isCorrect = nil
         showHint = false
         canShowHintButton = false
+        currentOptions = currentQuestion.options.shuffled()
         startTimer()
     }
 }

@@ -173,7 +173,7 @@ struct QuizView: View {
 
     private var optionsList: some View {
         VStack(spacing: 12) {
-            ForEach(viewModel.currentQuestion.options) { option in
+            ForEach(viewModel.currentOptions) { option in
                 VStack(spacing: 8) {
                     OptionButton(
                         title: option.word,
