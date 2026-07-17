@@ -47,6 +47,7 @@ class QuizViewModel: ObservableObject {
     }
 
     func startTimer() {
+        let isTimerEnabled = UserDefaults.standard.bool(forKey: "isTimerEnabled")
         let limit = UserDefaults.standard.double(forKey: "quizLimitTime")
         let actualLimit = limit > 0 ? limit : 10.0
         
@@ -59,9 +60,9 @@ class QuizViewModel: ObservableObject {
             .sink { [weak self] _ in
                 guard let self = self, self.timerActive else { return }
                 
-                if self.timeRemaining > 0 {
-                    self.timeRemaining -= 0.1
-                } else {
+                self.timeRemaining -= 0.1
+                    
+                if isTimerEnabled && self.timeRemaining <= 0 {
                     self.timerActive = false
                     self.isCorrect = false
                 }
